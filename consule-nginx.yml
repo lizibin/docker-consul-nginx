@@ -1,0 +1,49 @@
+version: "3"
+services:
+  consul:
+    container_name: consul
+    image: consul:latest
+    network_mode: host
+    environment: 
+      CONSUL_UI_BETA: "true"
+    command:  agent -server -bootstrap -ui  -bind=192.168.235.130 -client=0.0.0.0 -node=server01 
+    volumes:
+      - ./consule/data:/consul/data
+    restart: always
+  nginx:
+    container_name: nginx
+    image: nginx:latest
+    network_mode: host
+    restart: always
+    volumes:
+      - consul-nginx:/etc/nginx
+      - ./nginx/log:/var/log/nginx
+  consul-template:
+    container_name: consul-template
+    image: hashicorp/consul-template:alpine
+    network_mode: host
+    environment: 
+      CT_LOCAL_CONFIG: 'consul{address = "192.168.235.130:8500"} log_level = "debug" template{ source = "/etc/ctmpl/nginx.ctmpl" destination="/etc/nginx/nginx.conf" perms=0600}'
+    #CT_LOCAL_CONFIG: 'consul{address = "192.168.235.130:8500"} log_level = "debug" template{ source = "/etc/ctmpl/nginx.ctmpl" destination="/etc/nginx/nginx.conf" command="docker exec -it nginx service nginx reload" perms=0600}'
+    restart: always
+    privileged: true 
+    volumes:
+      - consul-nginx:/etc/nginx
+      - ./consule-temlate/nginx.ctmpl:/etc/ctmpl/nginx.ctmpl 
+      - /var/run/docker.sock:/var/run/docker.sock 
+      - /usr/bin/docker:/usr/bin/docker
+    depends_on:
+      - consul
+      - nginx
+  registrator:
+    container_name: registrator
+    image: gliderlabs/registrator:latest
+    command: consul://192.168.235.130:8500
+    network_mode: host
+    restart: always
+    volumes:
+      - /var/run/docker.sock:/tmp/docker.sock
+    depends_on:
+      - consul
+volumes:
+  consul-nginx:

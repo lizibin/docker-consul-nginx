@@ -1,0 +1,42 @@
+user  root; 
+worker_processes  auto; 
+
+error_log  /var/log/nginx/error.log  info;
+
+#pid        /var/log/nginx/nginx.pid; 
+
+
+events {
+    use epoll; 
+}
+
+http {
+
+    include       mime.types;
+    default_type  application/octet-stream;
+	
+	log_format  main '[$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for" "$upstream_addr"';
+    
+	access_log /var/log/nginx/access.log   main;
+	
+    sendfile        on;
+	
+    keepalive_timeout  65;
+	
+	upstream http_backend {
+	  #ip_hash;
+	  {{range service "nginx"}}
+	  server {{ .Address }}:{{ .Port }};
+	  {{ end }}
+	}
+	server {
+	  listen 80;
+	  server_name localhost;
+	  location / {
+		proxy_pass http://http_backend;
+	  }
+	}
+}
+
